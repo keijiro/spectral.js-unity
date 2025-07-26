@@ -10,7 +10,7 @@ namespace SpectralJS.Tests
         private Texture2D referenceTexture;
         private ComputeBuffer statisticsBuffer;
         
-        private const int STATISTICS_COUNT = 7; // totalPixels, matchedPixels, acceptablePixels, warningPixels, errorPixels, maxErrorAsUint, onePercentErrorPixels
+        private const int STATISTICS_COUNT = 5; // totalPixels, acceptablePixels, warningPixels, errorPixels, maxErrorAsUint
         private const float ERROR_THRESHOLD = 0.02f; // 2% tolerance
         private const float WARNING_THRESHOLD = 0.05f; // 5% warning threshold
         private const float ACCEPTABLE_ERROR_RATIO = 0.01f; // Allow 1% of pixels to have errors
@@ -18,18 +18,14 @@ namespace SpectralJS.Tests
         private struct ValidationResult
         {
             public float totalPixels;
-            public float matchedPixels;
             public float acceptablePixels;
             public float warningPixels;
             public float errorPixels;
             public float maxError;
-            public float onePercentErrorPixels;
             
-            public float MatchRatio => totalPixels > 0 ? matchedPixels / totalPixels : 0;
             public float AcceptableRatio => totalPixels > 0 ? acceptablePixels / totalPixels : 0;
             public float WarningRatio => totalPixels > 0 ? warningPixels / totalPixels : 0;
             public float ErrorRatio => totalPixels > 0 ? errorPixels / totalPixels : 0;
-            public float OnePercentErrorRatio => totalPixels > 0 ? onePercentErrorPixels / totalPixels : 0;
         }
         
         [OneTimeSetUp]
@@ -74,8 +70,8 @@ namespace SpectralJS.Tests
             testComputeShader.SetFloat("WarningThreshold", WARNING_THRESHOLD);
             
             // Calculate dispatch size
-            int threadGroupsX = Mathf.CeilToInt(referenceTexture.width / 8.0f);
-            int threadGroupsY = Mathf.CeilToInt(referenceTexture.height / 8.0f);
+            int threadGroupsX = Mathf.CeilToInt(referenceTexture.width / 4.0f);
+            int threadGroupsY = Mathf.CeilToInt(referenceTexture.height / 4.0f);
             
             // Dispatch compute shader
             testComputeShader.Dispatch(kernel, threadGroupsX, threadGroupsY, 1);
@@ -87,12 +83,10 @@ namespace SpectralJS.Tests
             return new ValidationResult
             {
                 totalPixels = results[0],
-                matchedPixels = results[1],
-                acceptablePixels = results[2],
-                warningPixels = results[3],
-                errorPixels = results[4],
-                maxError = results[5] / 10000.0f,  // Convert back from scaled uint
-                onePercentErrorPixels = results[6]
+                acceptablePixels = results[1],
+                warningPixels = results[2],
+                errorPixels = results[3],
+                maxError = results[4] / 10000.0f  // Convert back from scaled uint
             };
         }
         
@@ -101,21 +95,17 @@ namespace SpectralJS.Tests
         {
             var result = RunValidation("ColorBarValidation");
             
-            Debug.Log($"Color Bar Validation Results:");
-            Debug.Log($"  Total pixels: {result.totalPixels}");
-            Debug.Log($"  Match ratio: {result.MatchRatio:P2}");
-            Debug.Log($"  Acceptable ratio: {result.AcceptableRatio:P2}");
-            Debug.Log($"  Warning ratio: {result.WarningRatio:P2}");
-            Debug.Log($"  Error ratio: {result.ErrorRatio:P2}");
-            Debug.Log($"  1% error pixels: {result.onePercentErrorPixels} ({result.OnePercentErrorRatio:P2})");
-            Debug.Log($"  Max error: {result.maxError:F4}");
+            Debug.Log($"Color Bar Validation Results:\n" +
+                     $"  Reference texture size: {referenceTexture.width}x{referenceTexture.height}\n" +
+                     $"  Total pixels: {result.totalPixels}\n" +
+                     $"  Acceptable ratio: {result.AcceptableRatio:P2}\n" +
+                     $"  Warning ratio: {result.WarningRatio:P2}\n" +
+                     $"  Error ratio: {result.ErrorRatio:P2}\n" +
+                     $"  Max error: {result.maxError:F4}");
             
-            // Also output to console for visibility in test results
-            System.Console.WriteLine($"ColorBar - 1% error pixels: {result.onePercentErrorPixels} out of {result.totalPixels} total pixels");
-            
-            // Color bars should match almost perfectly (temporarily relaxed for debugging)
-            Assert.Greater(result.MatchRatio, 0.98f, 
-                $"Color bar match ratio too low: {result.MatchRatio:P2}. " +
+            // Color bars should have high accuracy
+            Assert.Greater(result.AcceptableRatio, 0.98f, 
+                $"Color bar acceptable ratio too low: {result.AcceptableRatio:P2}. " +
                 "This indicates the test environment may not be functioning correctly.");
             
             Assert.Less(result.maxError, ERROR_THRESHOLD * 2, 
@@ -127,17 +117,13 @@ namespace SpectralJS.Tests
         {
             var result = RunValidation("SpectralMixValidation");
             
-            Debug.Log($"Spectral Mix Validation Results:");
-            Debug.Log($"  Total pixels: {result.totalPixels}");
-            Debug.Log($"  Match ratio: {result.MatchRatio:P2}");
-            Debug.Log($"  Acceptable ratio: {result.AcceptableRatio:P2}");
-            Debug.Log($"  Warning ratio: {result.WarningRatio:P2}");
-            Debug.Log($"  Error ratio: {result.ErrorRatio:P2}");
-            Debug.Log($"  1% error pixels: {result.onePercentErrorPixels} ({result.OnePercentErrorRatio:P2})");
-            Debug.Log($"  Max error: {result.maxError:F4}");
-            
-            // Also output to console for visibility in test results
-            System.Console.WriteLine($"1% error pixels: {result.onePercentErrorPixels} out of {result.totalPixels} total pixels");
+            Debug.Log($"Spectral Mix Validation Results:\n" +
+                     $"  Reference texture size: {referenceTexture.width}x{referenceTexture.height}\n" +
+                     $"  Total pixels: {result.totalPixels}\n" +
+                     $"  Acceptable ratio: {result.AcceptableRatio:P2}\n" +
+                     $"  Warning ratio: {result.WarningRatio:P2}\n" +
+                     $"  Error ratio: {result.ErrorRatio:P2}\n" +
+                     $"  Max error: {result.maxError:F4}");
             
             // Spectral mix should have high accuracy with some tolerance
             Assert.Greater(result.AcceptableRatio, 1.0f - ACCEPTABLE_ERROR_RATIO, 
@@ -152,8 +138,8 @@ namespace SpectralJS.Tests
             // Log detailed error information if test fails
             if (result.ErrorRatio > ACCEPTABLE_ERROR_RATIO)
             {
-                Debug.LogError($"Spectral mix validation failed with {result.ErrorRatio:P2} error pixels");
-                Debug.LogError($"Maximum error: {result.maxError:F4}");
+                Debug.LogError($"Spectral mix validation failed with {result.ErrorRatio:P2} error pixels\n" +
+                              $"Maximum error: {result.maxError:F4}");
             }
         }
     }

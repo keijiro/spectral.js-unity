@@ -1,239 +1,86 @@
 #pragma kernel ColorBarValidation
 #pragma kernel SpectralMixValidation
 
-#include "../../Shaders/Spectral.hlsl"
+#include "SpectralReference.hlsl"
 
 // Input textures
 Texture2D<float4> ReferenceTexture;
 
 // Output statistics buffer
-// Structure: [totalPixels, matchedPixels, acceptablePixels, warningPixels, errorPixels, maxErrorAsUint, onePercentErrorPixels]
+// Structure: [totalPixels, acceptablePixels, warningPixels, errorPixels, maxErrorAsUint]
 RWStructuredBuffer<uint> Statistics;
 
 // Parameters
 float ErrorThreshold;
 float WarningThreshold;
 
-// HSV to RGB conversion
-float3 hsv2rgb(float3 c) {
-    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * lerp(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
 // Color difference calculation (using max component for simpler debugging)
 float ColorDifference(float3 color1, float3 color2) {
     float3 diff = abs(color1 - color2);
-    return max(max(diff.r, diff.g), diff.b);  // Use max component instead of length
+    return max(max(diff.r, diff.g), diff.b);
 }
 
-[numthreads(8, 8, 1)]
+// Update statistics for a pixel
+void UpdateStatistics(float diff) {
+    InterlockedAdd(Statistics[0], 1); // Total pixels
+    
+    if (diff < ErrorThreshold) {
+        InterlockedAdd(Statistics[1], 1); // Acceptable pixels
+    } else if (diff < WarningThreshold) {
+        InterlockedAdd(Statistics[2], 1); // Warning pixels
+    } else {
+        InterlockedAdd(Statistics[3], 1); // Error pixels
+    }
+    
+    // Update max error
+    uint diffAsUint = (uint)(diff * 10000.0);
+    InterlockedMax(Statistics[4], diffAsUint);
+}
+
+[numthreads(4, 4, 1)]
 void ColorBarValidation(uint3 id : SV_DispatchThreadID)
 {
     uint width, height;
     ReferenceTexture.GetDimensions(width, height);
     
-    // Only process color bar rows (17-18, which are indices 16-17 in 0-based)
-    uint colorBarStartRow = (uint)(height * 16.0 / 18.0);
-    if (id.y < colorBarStartRow || id.y >= height || id.x >= width)
+    if (id.x >= width || id.y >= height)
         return;
     
-    // Calculate grid coordinates directly from pixel coordinates
-    float gridSizeX = 16.0;
-    float gridSizeY = 18.0;
-    float2 cellCoord = floor(float2(id.xy) * float2(gridSizeX, gridSizeY) / float2(width, height));
+    // Only process color bar rows (17-18)
+    uint colorBarStartRow = (uint)(height * 16.0 / 18.0);
+    if (id.y < colorBarStartRow)
+        return;
+
+    // Flip Y coordinate to match GLSL bottom-left origin
+    float2 st = (id.xy + 0.5) / float2(width, height);
     
-    float3 expectedColor;
-    
-    if (cellCoord.y >= 16.0 && cellCoord.y < 17.0) {
-        // Row 17: HSV Hue color bar
-        float hue = cellCoord.x / (gridSizeX - 1.0);
-        expectedColor = hsv2rgb(float3(hue, 1.0, 1.0));
-    } else if (cellCoord.y >= 17.0) {
-        // Row 18: Grayscale bar
-        float gray = cellCoord.x / (gridSizeX - 1.0);
-        expectedColor = float3(gray, gray, gray);
-    } else {
-        // Should not reach here due to early return
-        expectedColor = float3(1.0, 0.0, 1.0); // Magenta for debugging
-    }
-    
-    // Load reference texture directly (no filtering)
+    float3 expectedColor = GenerateReferenceColor(st, float2(width, height));
     float4 referenceColor = ReferenceTexture.Load(int3(id.xy, 0));
-    
-    // Calculate difference
     float diff = ColorDifference(expectedColor, referenceColor.rgb);
     
-    // Update statistics atomically
-    InterlockedAdd(Statistics[0], 1); // Total pixels
-    
-    if (diff < ErrorThreshold) {
-        InterlockedAdd(Statistics[1], 1); // Matched pixels
-    }
-    
-    if (diff < ErrorThreshold) {
-        InterlockedAdd(Statistics[2], 1); // Acceptable pixels
-    } else if (diff < WarningThreshold) {
-        InterlockedAdd(Statistics[3], 1); // Warning pixels
-    } else {
-        InterlockedAdd(Statistics[4], 1); // Error pixels
-    }
-    
-    // Count pixels with more than 1% error
-    if (diff >= 0.01f) {
-        InterlockedAdd(Statistics[6], 1); // 1% error pixels
-    }
-    
-    // Update max error (simplified - store as uint scaled by 10000)
-    uint diffAsUint = (uint)(diff * 10000.0);
-    InterlockedMax(Statistics[5], diffAsUint);
+    UpdateStatistics(diff);
 }
 
-[numthreads(8, 8, 1)]
+[numthreads(4, 4, 1)]
 void SpectralMixValidation(uint3 id : SV_DispatchThreadID)
 {
     uint width, height;
     ReferenceTexture.GetDimensions(width, height);
     
-    // Only process spectral mix test rows (1-16)
-    if (id.y >= (uint)(height * 16.0 / 18.0) || id.x >= width)
+    if (id.x >= width || id.y >= height)
         return;
     
-    // Calculate grid coordinates directly from pixel coordinates
-    float gridSizeX = 16.0;
-    float gridSizeY = 18.0;
-    float2 grid = float2(id.xy) * float2(gridSizeX, gridSizeY) / float2(width, height);
-    float2 cellCoord = floor(grid);
-    float2 localCoord = frac(grid);
+    // Only process spectral mix test rows (1-16)
+    uint colorBarStartRow = (uint)(height * 16.0 / 18.0);
+    if (id.y >= colorBarStartRow)
+        return;
     
-    // Convert grid position to a unique index
-    float index = cellCoord.y * gridSizeX + cellCoord.x;
+    // Flip Y coordinate to match GLSL bottom-left origin
+    float2 st = (id.xy + 0.5) / float2(width, height);
     
-    float3 result;
-    
-    // Generate test colors based on grid position
-    if (index < 128.0) {
-        // Create a variety of colors using HSV-like approach
-        float hue1 = fmod(index * 7.0, 360.0) / 360.0;
-        float hue2 = fmod(index * 13.0 + 180.0, 360.0) / 360.0;
-        
-        // Convert hue to RGB
-        float3 color1 = float3(
-            0.5 + 0.5 * cos(6.28318 * (hue1 + 0.0)),
-            0.5 + 0.5 * cos(6.28318 * (hue1 + 0.333)),
-            0.5 + 0.5 * cos(6.28318 * (hue1 + 0.666))
-        );
-        
-        float3 color2 = float3(
-            0.5 + 0.5 * cos(6.28318 * (hue2 + 0.0)),
-            0.5 + 0.5 * cos(6.28318 * (hue2 + 0.333)),
-            0.5 + 0.5 * cos(6.28318 * (hue2 + 0.666))
-        );
-        
-        // Test different mixing methods in each cell
-        if (localCoord.x < 0.5 && localCoord.y < 0.5) {
-            result = spectral_mix(color1, color2, 0.25);
-        } else if (localCoord.x >= 0.5 && localCoord.y < 0.5) {
-            result = spectral_mix(color1, color2, 0.5);
-        } else if (localCoord.x < 0.5 && localCoord.y >= 0.5) {
-            result = spectral_mix(color1, color2, 0.75);
-        } else {
-            result = spectral_mix(color1, 0.5, color2, 0.5);
-        }
-    }
-    else if (index < 192.0) {
-        float subIndex = index - 128.0;
-        
-        // Extended special colors
-        float3 specialColors[16];
-        specialColors[0] = float3(0.01, 0.01, 0.01);   // Very dark gray
-        specialColors[1] = float3(1.0, 1.0, 1.0);     // White
-        specialColors[2] = float3(0.2, 0.2, 0.2);     // Dark gray
-        specialColors[3] = float3(0.5, 0.5, 0.5);     // Medium gray
-        specialColors[4] = float3(0.8, 0.8, 0.8);     // Light gray
-        specialColors[5] = float3(1.0, 0.0, 0.0);     // Pure Red
-        specialColors[6] = float3(0.0, 1.0, 0.0);     // Pure Green
-        specialColors[7] = float3(0.0, 0.0, 1.0);     // Pure Blue
-        specialColors[8] = float3(1.0, 1.0, 0.0);     // Yellow
-        specialColors[9] = float3(1.0, 0.0, 1.0);     // Magenta
-        specialColors[10] = float3(0.0, 1.0, 1.0);    // Cyan
-        specialColors[11] = float3(1.0, 0.5, 0.0);    // Orange
-        specialColors[12] = float3(0.5, 0.0, 1.0);    // Purple
-        specialColors[13] = float3(0.0, 0.5, 1.0);    // Sky blue
-        specialColors[14] = float3(1.0, 0.0, 0.5);    // Pink
-        specialColors[15] = float3(0.5, 1.0, 0.0);    // Lime
-        
-        int colorIndex1 = (int)fmod(subIndex, 16.0);
-        int colorIndex2 = (int)fmod(subIndex / 4.0, 16.0);
-        
-        float3 color1 = specialColors[colorIndex1];
-        float3 color2 = specialColors[colorIndex2];
-        
-        // Test with different tinting strengths
-        float tint1 = 0.7 + 0.3 * localCoord.x;
-        float tint2 = 0.7 + 0.3 * localCoord.y;
-        result = spectral_mix(color1, tint1, 0.5, color2, tint2, 0.5);
-    }
-    else {
-        float subIndex = index - 192.0;
-        
-        // Generate diverse test colors
-        float r1 = fmod(subIndex * 3.0, 11.0) / 10.0;
-        float g1 = fmod(subIndex * 5.0, 11.0) / 10.0;
-        float b1 = fmod(subIndex * 7.0, 11.0) / 10.0;
-        float3 color1 = float3(r1, g1, b1);
-        
-        float r2 = fmod(subIndex * 11.0, 13.0) / 12.0;
-        float g2 = fmod(subIndex * 13.0, 13.0) / 12.0;
-        float b2 = fmod(subIndex * 17.0, 13.0) / 12.0;
-        float3 color2 = float3(r2, g2, b2);
-        
-        float r3 = fmod(subIndex * 19.0, 17.0) / 16.0;
-        float g3 = fmod(subIndex * 23.0, 17.0) / 16.0;
-        float b3 = fmod(subIndex * 29.0, 17.0) / 16.0;
-        float3 color3 = float3(r3, g3, b3);
-        
-        if (subIndex < 32.0) {
-            // Three color mixing
-            result = spectral_mix(color1, 0.33, color2, 0.33, color3, 0.34);
-        } else {
-            // Four color mixing
-            float r4 = fmod(subIndex * 31.0, 19.0) / 18.0;
-            float g4 = fmod(subIndex * 37.0, 19.0) / 18.0;
-            float b4 = fmod(subIndex * 41.0, 19.0) / 18.0;
-            float3 color4 = float3(r4, g4, b4);
-            
-            result = spectral_mix(color1, 0.25, color2, 0.25, color3, 0.25, color4, 0.25);
-        }
-    }
-    
-    // Load reference texture directly (no filtering)
+    float3 expectedColor = GenerateReferenceColor(st, float2(width, height));
     float4 referenceColor = ReferenceTexture.Load(int3(id.xy, 0));
+    float diff = ColorDifference(expectedColor, referenceColor.rgb);
     
-    // Calculate difference
-    float diff = ColorDifference(result, referenceColor.rgb);
-    
-    // Update statistics atomically
-    InterlockedAdd(Statistics[0], 1); // Total pixels
-    
-    if (diff < ErrorThreshold) {
-        InterlockedAdd(Statistics[1], 1); // Matched pixels
-    }
-    
-    if (diff < ErrorThreshold) {
-        InterlockedAdd(Statistics[2], 1); // Acceptable pixels
-    } else if (diff < WarningThreshold) {
-        InterlockedAdd(Statistics[3], 1); // Warning pixels
-    } else {
-        InterlockedAdd(Statistics[4], 1); // Error pixels
-    }
-    
-    // Count pixels with more than 1% error
-    if (diff >= 0.01f) {
-        InterlockedAdd(Statistics[6], 1); // 1% error pixels
-    }
-    
-    // Update max error (simplified - store as uint scaled by 10000)
-    uint diffAsUint = (uint)(diff * 10000.0);
-    InterlockedMax(Statistics[5], diffAsUint);
+    UpdateStatistics(diff);
 }
