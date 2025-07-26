@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "jp.keijiro.klutter-tools": "2.1.0",
+    "jp.keijiro.yamu": "1.0.2",
+    "com.unity.modules.imageconversion": "1.0.0"
+  },
+  "scopedRegistries": [
+    {
+      "name": "Keijiro",
+      "url": "https://registry.npmjs.com",
+      "scopes": [
+        "jp.keijiro"
+      ]
+    }
+  ]
+}
