@@ -1,0 +1,12 @@
+{
+    "author": "Keijiro Takahashi",
+    "dependencies": { },
+    "description": "Spectral.js is a paint like color mixing library utilizing the Kubelka-Munk theory.",
+    "displayName": "Spectral.js for Unity",
+    "keywords": [ "unity" ],
+    "license": "MIT",
+    "name": "jp.keijiro.spectral-js-unity",
+    "unity": "6000.0",
+    "unityRelease": "0f1",
+    "version": "1.0.0"
+}

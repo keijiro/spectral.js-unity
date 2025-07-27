@@ -23,6 +23,12 @@
       "dependencies": {},
       "url": "https://registry.npmjs.com"
     },
+    "jp.keijiro.spectral-js-unity": {
+      "version": "file:jp.keijiro.spectral-js-unity",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "jp.keijiro.yamu": {
       "version": "1.0.2",
       "depth": 0,
