@@ -6,23 +6,30 @@ public class SpectralTriangleSample : MonoBehaviour
     [Header("Triangle Colors")]
     [ColorUsage(false)]
     public Color colorA = Color.red;
-    
+
     [ColorUsage(false)]
     public Color colorB = Color.green;
-    
+
     [ColorUsage(false)]
     public Color colorC = Color.blue;
 
     Mesh triangleMesh;
-    Material material;
+    Material spectralMaterial;
+    Material linearMaterial;
 
     void Start() => Initialize();
 
     void Update()
     {
         EnsureResourcesCreated();
-        if (triangleMesh != null && material != null)
-            Graphics.DrawMesh(triangleMesh, transform.localToWorldMatrix, material, 0);
+        if (triangleMesh != null && spectralMaterial != null && linearMaterial != null)
+        {
+            var leftMatrix = transform.localToWorldMatrix * Matrix4x4.Translate(Vector3.left * 0.6f);
+            var rightMatrix = transform.localToWorldMatrix * Matrix4x4.Translate(Vector3.right * 0.6f);
+
+            Graphics.DrawMesh(triangleMesh, leftMatrix, spectralMaterial, 0);
+            Graphics.DrawMesh(triangleMesh, rightMatrix, linearMaterial, 0);
+        }
     }
 
     void OnEnable()
@@ -33,7 +40,7 @@ public class SpectralTriangleSample : MonoBehaviour
 
     void OnValidate()
     {
-        if (material != null)
+        if (spectralMaterial != null && linearMaterial != null)
             UpdateColors();
     }
 
@@ -43,7 +50,7 @@ public class SpectralTriangleSample : MonoBehaviour
     void Initialize()
     {
         CreateTriangleMesh();
-        CreateMaterial();
+        CreateMaterials();
         UpdateColors();
     }
 
@@ -51,8 +58,8 @@ public class SpectralTriangleSample : MonoBehaviour
     {
         if (triangleMesh == null)
             CreateTriangleMesh();
-        if (material == null)
-            CreateMaterial();
+        if (spectralMaterial == null || linearMaterial == null)
+            CreateMaterials();
     }
 
     void CreateTriangleMesh()
@@ -81,7 +88,7 @@ public class SpectralTriangleSample : MonoBehaviour
         triangleMesh.RecalculateNormals();
     }
 
-    void CreateMaterial()
+    void CreateMaterials()
     {
         var shader = Shader.Find("Custom/SpectralTriangle");
         if (shader == null)
@@ -90,16 +97,24 @@ public class SpectralTriangleSample : MonoBehaviour
             return;
         }
 
-        material = new Material(shader);
+        spectralMaterial = new Material(shader);
+        linearMaterial = new Material(shader);
     }
 
     void UpdateColors()
     {
-        if (material == null) return;
+        if (spectralMaterial == null || linearMaterial == null) return;
 
+        SetMaterialColors(spectralMaterial, 1.0f);
+        SetMaterialColors(linearMaterial, 0.0f);
+    }
+
+    void SetMaterialColors(Material material, float useSpectralMix)
+    {
         material.SetColor("_ColorA", colorA);
         material.SetColor("_ColorB", colorB);
         material.SetColor("_ColorC", colorC);
+        material.SetFloat("_UseSpectralMix", useSpectralMix);
     }
 
     void CleanupResources()
@@ -109,11 +124,17 @@ public class SpectralTriangleSample : MonoBehaviour
             DestroyResource(triangleMesh);
             triangleMesh = null;
         }
-            
-        if (material != null)
+
+        if (spectralMaterial != null)
         {
-            DestroyResource(material);
-            material = null;
+            DestroyResource(spectralMaterial);
+            spectralMaterial = null;
+        }
+
+        if (linearMaterial != null)
+        {
+            DestroyResource(linearMaterial);
+            linearMaterial = null;
         }
     }
 

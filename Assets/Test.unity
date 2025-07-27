@@ -148,9 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cfb25eb40442e7a52dba8db1639e1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  colorA: {r: 0.5849056, g: 0.18332142, b: 0.08001069, a: 1}
-  colorB: {r: 0.745283, g: 0.74368525, b: 0.17225882, a: 1}
-  colorC: {r: 0.036222856, g: 0.30718088, b: 0.6981132, a: 1}
+  colorA: {r: 0.5019608, g: 0.007843138, b: 0.18039216, a: 1}
+  colorB: {r: 0.9882353, g: 0.827451, b: 0, a: 1}
+  colorC: {r: 0, g: 0.12941177, b: 0.52156866, a: 1}
 --- !u!4 &287602749
 Transform:
   m_ObjectHideFlags: 0
@@ -218,7 +218,7 @@ Camera:
   far clip plane: 100
   field of view: 60
   orthographic: 1
-  orthographic size: 0.5
+  orthographic size: 0.6666667
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
