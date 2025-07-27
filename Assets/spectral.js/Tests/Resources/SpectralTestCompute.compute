@@ -51,7 +51,6 @@ void ColorBarValidation(uint3 id : SV_DispatchThreadID)
     if (id.y < colorBarStartRow)
         return;
 
-    // Flip Y coordinate to match GLSL bottom-left origin
     float2 st = (id.xy + 0.5) / float2(width, height);
     
     float3 expectedColor = GenerateReferenceColor(st, float2(width, height));
@@ -75,7 +74,6 @@ void SpectralMixValidation(uint3 id : SV_DispatchThreadID)
     if (id.y >= colorBarStartRow)
         return;
     
-    // Flip Y coordinate to match GLSL bottom-left origin
     float2 st = (id.xy + 0.5) / float2(width, height);
     
     float3 expectedColor = GenerateReferenceColor(st, float2(width, height));
