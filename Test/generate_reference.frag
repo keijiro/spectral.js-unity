@@ -1,9 +1,13 @@
+#version 330
+
 #ifdef GL_ES
 precision mediump float;
 #endif
 
 uniform vec2 u_resolution;
 uniform float u_time;
+
+out vec4 fragColor;
 
 #include "spectral.glsl"
 
@@ -19,35 +23,35 @@ void main() {
     
     // Create a color wheel + additional test colors
     // Divide into a 16x18 grid to test 256 different color combinations + color bars
-    float gridSizeX = 16.0;
-    float gridSizeY = 18.0;
-    vec2 grid = st * vec2(gridSizeX, gridSizeY);
-    vec2 cellCoord = floor(grid);
+    int gridSizeX = 16;
+    int gridSizeY = 18;
+    vec2 grid = st * vec2(float(gridSizeX), float(gridSizeY));
+    ivec2 cellCoord = ivec2(floor(grid));
     vec2 localCoord = fract(grid);
     
     // Convert grid position to a unique index
-    float index = cellCoord.y * gridSizeX + cellCoord.x;
+    int index = cellCoord.y * gridSizeX + cellCoord.x;
     
     vec3 result;
     
     // Color bars section (rows 17-18)
-    if (cellCoord.y >= 16.0) {
-        if (cellCoord.y == 16.0) {
+    if (cellCoord.y >= 16) {
+        if (cellCoord.y == 16) {
             // Row 17: HSV Hue color bar (H varies 0-1, S=1, V=1)
-            float hue = cellCoord.x / (gridSizeX - 1.0);  // 0 to 1 across 16 cells
+            float hue = float(cellCoord.x) / float(gridSizeX - 1);  // 0 to 1 across 16 cells
             result = hsv2rgb(vec3(hue, 1.0, 1.0));
         } else {
             // Row 18: Grayscale bar (0-1)
-            float gray = cellCoord.x / (gridSizeX - 1.0);  // 0 to 1 across 16 cells
+            float gray = float(cellCoord.x) / float(gridSizeX - 1);  // 0 to 1 across 16 cells
             result = vec3(gray);
         }
     }
     // Generate test colors based on grid position
     // First 128 cells: Primary color tests with spectral mixing
-    else if (index < 128.0) {
+    else if (index < 128) {
         // Create a variety of colors using HSV-like approach
-        float hue1 = mod(index * 7.0, 360.0) / 360.0;
-        float hue2 = mod(index * 13.0 + 180.0, 360.0) / 360.0;
+        float hue1 = mod(float(index * 7), 360.0) / 360.0;
+        float hue2 = mod(float(index * 13 + 180), 360.0) / 360.0;
         
         // Convert hue to RGB (simplified HSV to RGB)
         vec3 color1 = vec3(
@@ -78,8 +82,8 @@ void main() {
         }
     }
     // Next 64 cells: Edge cases and special colors
-    else if (index < 192.0) {
-        float subIndex = index - 128.0;
+    else if (index < 192) {
+        int subIndex = index - 128;
         
         // Extended special colors covering more edge cases
         vec3 specialColors[16];
@@ -100,8 +104,8 @@ void main() {
         specialColors[14] = vec3(1.0, 0.0, 0.5);    // Pink
         specialColors[15] = vec3(0.5, 1.0, 0.0);    // Lime
         
-        int colorIndex1 = int(mod(subIndex, 16.0));
-        int colorIndex2 = int(mod(subIndex / 4.0, 16.0));
+        int colorIndex1 = subIndex % 16;
+        int colorIndex2 = (subIndex / 4) % 16;
         
         vec3 color1 = specialColors[colorIndex1];
         vec3 color2 = specialColors[colorIndex2];
@@ -113,25 +117,25 @@ void main() {
     }
     // Last 64 cells: Three and four color mixing
     else {
-        float subIndex = index - 192.0;
+        int subIndex = index - 192;
         
         // Generate diverse test colors
-        float r1 = mod(subIndex * 3.0, 11.0) / 10.0;
-        float g1 = mod(subIndex * 5.0, 11.0) / 10.0;
-        float b1 = mod(subIndex * 7.0, 11.0) / 10.0;
+        float r1 = float((subIndex * 3) % 11) / 10.0;
+        float g1 = float((subIndex * 5) % 11) / 10.0;
+        float b1 = float((subIndex * 7) % 11) / 10.0;
         vec3 color1 = vec3(r1, g1, b1);
         
-        float r2 = mod(subIndex * 11.0, 13.0) / 12.0;
-        float g2 = mod(subIndex * 13.0, 13.0) / 12.0;
-        float b2 = mod(subIndex * 17.0, 13.0) / 12.0;
+        float r2 = float((subIndex * 11) % 13) / 12.0;
+        float g2 = float((subIndex * 13) % 13) / 12.0;
+        float b2 = float((subIndex * 17) % 13) / 12.0;
         vec3 color2 = vec3(r2, g2, b2);
         
-        float r3 = mod(subIndex * 19.0, 17.0) / 16.0;
-        float g3 = mod(subIndex * 23.0, 17.0) / 16.0;
-        float b3 = mod(subIndex * 29.0, 17.0) / 16.0;
+        float r3 = float((subIndex * 19) % 17) / 16.0;
+        float g3 = float((subIndex * 23) % 17) / 16.0;
+        float b3 = float((subIndex * 29) % 17) / 16.0;
         vec3 color3 = vec3(r3, g3, b3);
         
-        if (subIndex < 32.0) {
+        if (subIndex < 32) {
             // Three color mixing
             float f1 = 0.33;
             float f2 = 0.33;
@@ -139,9 +143,9 @@ void main() {
             result = spectral_mix(color1, f1, color2, f2, color3, f3);
         } else {
             // Four color mixing
-            float r4 = mod(subIndex * 31.0, 19.0) / 18.0;
-            float g4 = mod(subIndex * 37.0, 19.0) / 18.0;
-            float b4 = mod(subIndex * 41.0, 19.0) / 18.0;
+            float r4 = float((subIndex * 31) % 19) / 18.0;
+            float g4 = float((subIndex * 37) % 19) / 18.0;
+            float b4 = float((subIndex * 41) % 19) / 18.0;
             vec3 color4 = vec3(r4, g4, b4);
             
             float f1 = 0.25;
@@ -152,5 +156,5 @@ void main() {
         }
     }
     
-    gl_FragColor = vec4(result, 1.0);
+    fragColor = vec4(result, 1.0);
 }

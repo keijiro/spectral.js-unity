@@ -12,33 +12,33 @@ float3 hsv2rgb(float3 c) {
 
 // Generate reference pattern colors for testing spectral mixing
 float3 GenerateReferenceColor(float2 uv, float2 resolution) {
-    float gridSizeX = 16.0;
-    float gridSizeY = 18.0;
-    float2 grid = uv * float2(gridSizeX, gridSizeY);
-    float2 cellCoord = floor(grid);
+    int gridSizeX = 16;
+    int gridSizeY = 18;
+    float2 grid = uv * float2(float(gridSizeX), float(gridSizeY));
+    int2 cellCoord = int2(floor(grid));
     float2 localCoord = frac(grid);
     
-    float index = cellCoord.y * gridSizeX + cellCoord.x;
+    int index = cellCoord.y * gridSizeX + cellCoord.x;
     
     float3 result;
     
     // Color bars section (rows 17-18)
-    if (cellCoord.y >= 16.0) {
-        if (cellCoord.y == 16.0) {
+    if (cellCoord.y >= 16) {
+        if (cellCoord.y == 16) {
             // Row 17: HSV Hue color bar (H varies 0-1, S=1, V=1)
-            float hue = cellCoord.x / (gridSizeX - 1.0);
+            float hue = float(cellCoord.x) / float(gridSizeX - 1);
             result = hsv2rgb(float3(hue, 1.0, 1.0));
         } else {
             // Row 18: Grayscale bar (0-1)
-            float gray = cellCoord.x / (gridSizeX - 1.0);
+            float gray = float(cellCoord.x) / float(gridSizeX - 1);
             result = float3(gray, gray, gray);
         }
     }
     // Generate test colors based on grid position
     // First 128 cells: Primary color tests with spectral mixing
-    else if (index < 128.0) {
-        float hue1 = fmod(index * 7.0, 360.0) / 360.0;
-        float hue2 = fmod(index * 13.0 + 180.0, 360.0) / 360.0;
+    else if (index < 128) {
+        float hue1 = fmod(float(index * 7), 360.0) / 360.0;
+        float hue2 = fmod(float(index * 13 + 180), 360.0) / 360.0;
         
         float3 color1 = float3(
             0.5 + 0.5 * cos(6.28318 * (hue1 + 0.0)),
@@ -63,8 +63,8 @@ float3 GenerateReferenceColor(float2 uv, float2 resolution) {
         }
     }
     // Next 64 cells: Edge cases and special colors
-    else if (index < 192.0) {
-        float subIndex = index - 128.0;
+    else if (index < 192) {
+        int subIndex = index - 128;
         
         float3 specialColors[16] = {
             float3(0.01, 0.01, 0.01),   // Very dark gray
@@ -85,8 +85,8 @@ float3 GenerateReferenceColor(float2 uv, float2 resolution) {
             float3(0.5, 1.0, 0.0)      // Lime
         };
         
-        int colorIndex1 = (int)fmod(subIndex, 16.0);
-        int colorIndex2 = (int)fmod(subIndex / 4.0, 16.0);
+        int colorIndex1 = subIndex % 16;
+        int colorIndex2 = (subIndex / 4) % 16;
         
         float3 color1 = specialColors[colorIndex1];
         float3 color2 = specialColors[colorIndex2];
@@ -97,32 +97,32 @@ float3 GenerateReferenceColor(float2 uv, float2 resolution) {
     }
     // Last 64 cells: Three and four color mixing
     else {
-        float subIndex = index - 192.0;
+        int subIndex = index - 192;
         
-        float r1 = fmod(subIndex * 3.0, 11.0) / 10.0;
-        float g1 = fmod(subIndex * 5.0, 11.0) / 10.0;
-        float b1 = fmod(subIndex * 7.0, 11.0) / 10.0;
+        float r1 = float((subIndex * 3) % 11) / 10.0;
+        float g1 = float((subIndex * 5) % 11) / 10.0;
+        float b1 = float((subIndex * 7) % 11) / 10.0;
         float3 color1 = float3(r1, g1, b1);
         
-        float r2 = fmod(subIndex * 11.0, 13.0) / 12.0;
-        float g2 = fmod(subIndex * 13.0, 13.0) / 12.0;
-        float b2 = fmod(subIndex * 17.0, 13.0) / 12.0;
+        float r2 = float((subIndex * 11) % 13) / 12.0;
+        float g2 = float((subIndex * 13) % 13) / 12.0;
+        float b2 = float((subIndex * 17) % 13) / 12.0;
         float3 color2 = float3(r2, g2, b2);
         
-        float r3 = fmod(subIndex * 19.0, 17.0) / 16.0;
-        float g3 = fmod(subIndex * 23.0, 17.0) / 16.0;
-        float b3 = fmod(subIndex * 29.0, 17.0) / 16.0;
+        float r3 = float((subIndex * 19) % 17) / 16.0;
+        float g3 = float((subIndex * 23) % 17) / 16.0;
+        float b3 = float((subIndex * 29) % 17) / 16.0;
         float3 color3 = float3(r3, g3, b3);
         
-        if (subIndex < 32.0) {
+        if (subIndex < 32) {
             float f1 = 0.33;
             float f2 = 0.33;
             float f3 = 0.34;
             result = spectral_mix(color1, f1, color2, f2, color3, f3);
         } else {
-            float r4 = fmod(subIndex * 31.0, 19.0) / 18.0;
-            float g4 = fmod(subIndex * 37.0, 19.0) / 18.0;
-            float b4 = fmod(subIndex * 41.0, 19.0) / 18.0;
+            float r4 = float((subIndex * 31) % 19) / 18.0;
+            float g4 = float((subIndex * 37) % 19) / 18.0;
+            float b4 = float((subIndex * 41) % 19) / 18.0;
             float3 color4 = float3(r4, g4, b4);
             
             float f1 = 0.25;
