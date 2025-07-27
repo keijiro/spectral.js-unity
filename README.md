@@ -1,5 +1,9 @@
 # Spectral.js for Unity
 
+![screenshot](https://github.com/user-attachments/assets/9c7c7e3d-c291-4aec-b4f6-05200b54af92)
+
+*(Left: Simple interpolation in sRGB, Right: Mix with Spectral.js)*
+
 **[Spectral.js]** is a lightweight library for realistic color mixing based on
 the Kubelka-Munk theory. It's designed specifically for developers and artists
 aiming to implement realistic pigment mixing in their projects.
