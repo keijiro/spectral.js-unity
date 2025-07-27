@@ -9,7 +9,7 @@ namespace SpectralJS.Tests
         private ComputeShader testComputeShader;
         private Texture2D referenceTexture;
         private ComputeBuffer statisticsBuffer;
-        
+
         private const int STATISTICS_COUNT = 5; // totalPixels, acceptablePixels, warningPixels, errorPixels, maxErrorAsUint
         private const float ERROR_THRESHOLD = 0.02f; // 2% tolerance
         private const float WARNING_THRESHOLD = 0.05f; // 5% warning threshold
@@ -27,7 +27,7 @@ namespace SpectralJS.Tests
             public float WarningRatio => totalPixels > 0 ? warningPixels / totalPixels : 0;
             public float ErrorRatio => totalPixels > 0 ? errorPixels / totalPixels : 0;
         }
-        
+
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -42,7 +42,7 @@ namespace SpectralJS.Tests
             // Create statistics buffer
             statisticsBuffer = new ComputeBuffer(STATISTICS_COUNT, sizeof(uint));
         }
-        
+
         [OneTimeTearDown]
         public void OneTimeTearDown()
         {
@@ -52,14 +52,14 @@ namespace SpectralJS.Tests
                 statisticsBuffer = null;
             }
         }
-        
+
         private ValidationResult RunValidation(string kernelName)
         {
             // Clear statistics buffer explicitly
             uint[] clearData = new uint[STATISTICS_COUNT];
             for (int i = 0; i < STATISTICS_COUNT; i++) clearData[i] = 0;
             statisticsBuffer.SetData(clearData);
-            
+
             // Get kernel
             int kernel = testComputeShader.FindKernel(kernelName);
             
@@ -68,14 +68,14 @@ namespace SpectralJS.Tests
             testComputeShader.SetBuffer(kernel, "Statistics", statisticsBuffer);
             testComputeShader.SetFloat("ErrorThreshold", ERROR_THRESHOLD);
             testComputeShader.SetFloat("WarningThreshold", WARNING_THRESHOLD);
-            
+
             // Calculate dispatch size
             int threadGroupsX = Mathf.CeilToInt(referenceTexture.width / 4.0f);
             int threadGroupsY = Mathf.CeilToInt(referenceTexture.height / 4.0f);
-            
+
             // Dispatch compute shader
             testComputeShader.Dispatch(kernel, threadGroupsX, threadGroupsY, 1);
-            
+
             // Read back results
             uint[] results = new uint[STATISTICS_COUNT];
             statisticsBuffer.GetData(results);
